@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:16
+    container_name: devices_db
+    environment:
+      POSTGRES_DB: devices
+      POSTGRES_USER: devices
+      POSTGRES_PASSWORD: devices
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker-data/postgres:/var/lib/postgresql/data
+  app:
+    build: .
+    container_name: devices_app
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/devices
+      DB_USER: devices
+      DB_PASSWORD: devices
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
