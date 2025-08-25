@@ -36,9 +36,10 @@ class DeviceControllerTest {
   @Autowired ObjectMapper om;
 
   @MockBean DeviceService service;
+  @MockBean IdempotencyService idempotencyService; // necessário após Commit 9
 
   @Test
-  void create_shouldReturn201_andLocation() throws Exception {
+  void create_shouldReturn201_location_andEtag() throws Exception {
     var id = UUID.randomUUID();
     var d = new Device(id, "WS-01", "Lenovo", DeviceState.AVAILABLE, Instant.parse("2025-01-01T00:00:00Z"));
     org.mockito.Mockito.when(service.create(any())).thenReturn(d);
@@ -50,6 +51,7 @@ class DeviceControllerTest {
         .content(om.writeValueAsBytes(body)))
       .andExpect(status().isCreated())
       .andExpect(header().string("Location", "/devices/" + id))
+      .andExpect(header().exists("ETag")) // novo header do Commit 9
       .andExpect(jsonPath("$.id", is(id.toString())))
       .andExpect(jsonPath("$.name", is("WS-01")))
       .andExpect(jsonPath("$.brand", is("Lenovo")))
@@ -69,12 +71,27 @@ class DeviceControllerTest {
   }
 
   @Test
-  void list_byState_shouldReturnFiltered() throws Exception {
+  void get_shouldReturn304_whenIfNoneMatchMatches() throws Exception {
+    var id = UUID.randomUUID();
+    var d = new Device(id, "WS-01", "Lenovo", DeviceState.AVAILABLE, Instant.parse("2025-01-01T00:00:00Z"));
+    org.mockito.Mockito.when(service.get(id)).thenReturn(d);
+
+    // Como o teste está no mesmo pacote (dev.roberto.devices.web), EtagUtil é acessível
+    var etag = EtagUtil.etagFor(d);
+
+    mvc.perform(get("/devices/{id}", id).header("If-None-Match", etag))
+      .andExpect(status().isNotModified())
+      .andExpect(header().string("ETag", etag));
+  }
+
+  @Test
+  void list_byState_shouldReturnFiltered_andTotalCountHeader() throws Exception {
     var a = new Device(UUID.randomUUID(), "A", "Apple", DeviceState.AVAILABLE, Instant.now());
     org.mockito.Mockito.when(service.listByState(DeviceState.AVAILABLE)).thenReturn(List.of(a));
 
     mvc.perform(get("/devices").param("state", "available"))
       .andExpect(status().isOk())
+      .andExpect(header().string("X-Total-Count", "1")) // novo header do Commit 9
       .andExpect(jsonPath("$", hasSize(1)))
       .andExpect(jsonPath("$[0].name", is("A")))
       .andExpect(jsonPath("$[0].state", is("AVAILABLE")));

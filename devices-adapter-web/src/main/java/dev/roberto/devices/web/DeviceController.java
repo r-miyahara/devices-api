@@ -22,31 +22,70 @@ import java.util.stream.Collectors;
 public class DeviceController {
 
   private final DeviceService service;
+  private final IdempotencyService idempotencyService;
 
-  public DeviceController(DeviceService service) {
+  public DeviceController(DeviceService service, IdempotencyService idempotencyService) {
     this.service = service;
+    this.idempotencyService = idempotencyService;
   }
+
 
   // POST /devices
   @PostMapping
-  public ResponseEntity<DeviceResponse> create(@Valid @RequestBody DeviceRequest req) {
+  public ResponseEntity<DeviceResponse> create(
+    @RequestHeader(value = "Idempotency-Key", required = false) String idemKey,
+    @Valid @RequestBody DeviceRequest req
+  ) {
+    if (idemKey != null && !idemKey.isBlank()) {
+      var existing = idempotencyService.get(idemKey);
+      if (existing.isPresent()) {
+        var d = service.get(existing.get());
+        return ResponseEntity.ok()
+          .header("Idempotency-Replay", "true")
+          .header("ETag", EtagUtil.etagFor(d))
+          .location(URI.create("/devices/" + d.id()))
+          .body(DeviceMapper.toResponse(d));
+      }
+    }
+
     var created = service.create(new CreateDeviceCommand(req.name(), req.brand(), req.state()));
+
+    if (idemKey != null && !idemKey.isBlank()) {
+      idempotencyService.putIfAbsent(idemKey, created.id());
+    }
+
     return ResponseEntity.created(URI.create("/devices/" + created.id()))
+      .header("ETag", EtagUtil.etagFor(created))
       .body(DeviceMapper.toResponse(created));
   }
 
-  // GET /devices/{id}
+
   @GetMapping("/{id}")
-  public DeviceResponse get(@PathVariable UUID id) {
-    return DeviceMapper.toResponse(service.get(id));
+  public ResponseEntity<DeviceResponse> get(
+    @PathVariable UUID id,
+    @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch
+  ) {
+    var d = service.get(id);
+    var etag = EtagUtil.etagFor(d);
+    if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
+      return ResponseEntity.status(304).eTag(etag).build();
+    }
+    return ResponseEntity.ok()
+      .eTag(etag)
+      .body(DeviceMapper.toResponse(d));
   }
 
-  // GET /devices?brand=&state=
+
   @GetMapping
-  public List<DeviceResponse> list(
+  public ResponseEntity<List<DeviceResponse>> list(
     @RequestParam Optional<String> brand,
-    @RequestParam Optional<String> state
+    @RequestParam Optional<String> state,
+    @RequestParam(defaultValue = "0") int page,
+    @RequestParam(defaultValue = "20") int size
   ) {
+    size = Math.max(1, Math.min(size, 200)); // limites razoáveis
+    page = Math.max(0, page);
+
     List<Device> base;
     if (brand.isEmpty() && state.isEmpty()) {
       base = service.listAll();
@@ -55,13 +94,21 @@ public class DeviceController {
     } else if (state.isPresent() && brand.isEmpty()) {
       base = service.listByState(parseState(state.get()));
     } else {
-      // ambos presentes → interseção simples
       var byBrand = service.listByBrand(brand.get());
       var st = parseState(state.get());
-      base = byBrand.stream().filter(d -> d.state() == st).collect(Collectors.toList());
+      base = byBrand.stream().filter(d -> d.state() == st).toList();
     }
-    return base.stream().map(DeviceMapper::toResponse).toList();
+
+    int total = base.size();
+    int from = Math.min(page * size, total);
+    int to = Math.min(from + size, total);
+    var pageList = base.subList(from, to).stream().map(DeviceMapper::toResponse).toList();
+
+    return ResponseEntity.ok()
+      .header("X-Total-Count", String.valueOf(total))
+      .body(pageList);
   }
+
 
   // PUT /devices/{id}
   @PutMapping("/{id}")
