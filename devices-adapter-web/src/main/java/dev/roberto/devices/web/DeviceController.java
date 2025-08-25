@@ -3,6 +3,7 @@ package dev.roberto.devices.web;
 import dev.roberto.devices.domain.model.Device;
 import dev.roberto.devices.domain.model.DeviceState;
 import dev.roberto.devices.usecase.DeviceService;
+import dev.roberto.devices.usecase.PageResult;
 import dev.roberto.devices.usecase.command.CreateDeviceCommand;
 import dev.roberto.devices.usecase.command.UpdateDevicePatchCommand;
 import dev.roberto.devices.usecase.command.UpdateDevicePutCommand;
@@ -23,7 +24,6 @@ public class DeviceController {
 
   private final DeviceService service;
   private final IdempotencyService idempotencyService;
-
   public DeviceController(DeviceService service, IdempotencyService idempotencyService) {
     this.service = service;
     this.idempotencyService = idempotencyService;
@@ -70,9 +70,7 @@ public class DeviceController {
     if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
       return ResponseEntity.status(304).eTag(etag).build();
     }
-    return ResponseEntity.ok()
-      .eTag(etag)
-      .body(DeviceMapper.toResponse(d));
+    return ResponseEntity.ok().eTag(etag).body(DeviceMapper.toResponse(d));
   }
 
 
@@ -83,55 +81,55 @@ public class DeviceController {
     @RequestParam(defaultValue = "0") int page,
     @RequestParam(defaultValue = "20") int size
   ) {
-    size = Math.max(1, Math.min(size, 200)); // limites razoáveis
+    size = Math.max(1, Math.min(size, 200));
     page = Math.max(0, page);
 
-    List<Device> base;
-    if (brand.isEmpty() && state.isEmpty()) {
-      base = service.listAll();
-    } else if (brand.isPresent() && state.isEmpty()) {
-      base = service.listByBrand(brand.get());
-    } else if (state.isPresent() && brand.isEmpty()) {
-      base = service.listByState(parseState(state.get()));
-    } else {
-      var byBrand = service.listByBrand(brand.get());
-      var st = parseState(state.get());
-      base = byBrand.stream().filter(d -> d.state() == st).toList();
-    }
+    Optional<DeviceState> st = state.map(s -> parseState(s));
+    PageResult<Device> pr = service.listPaged(brand, st, page, size);
 
-    int total = base.size();
-    int from = Math.min(page * size, total);
-    int to = Math.min(from + size, total);
-    var pageList = base.subList(from, to).stream().map(DeviceMapper::toResponse).toList();
-
+    var body = pr.items().stream().map(DeviceMapper::toResponse).toList();
     return ResponseEntity.ok()
-      .header("X-Total-Count", String.valueOf(total))
-      .body(pageList);
+      .header("X-Total-Count", String.valueOf(pr.total()))
+      .body(body);
   }
 
-
-  // PUT /devices/{id}
   @PutMapping("/{id}")
-  public DeviceResponse updatePut(@PathVariable UUID id, @Valid @RequestBody DeviceRequest req) {
+  public ResponseEntity<DeviceResponse> updatePut(
+    @PathVariable UUID id,
+    @RequestHeader(value = "If-Match", required = false) String ifMatch,
+    @Valid @RequestBody DeviceRequest req
+  ) {
+    assertIfMatch(id, ifMatch);
     var updated = service.updatePut(new UpdateDevicePutCommand(id, req.name(), req.brand(), req.state()));
-    return DeviceMapper.toResponse(updated);
+    return ResponseEntity.ok()
+      .eTag(EtagUtil.etagFor(updated))
+      .body(DeviceMapper.toResponse(updated));
   }
 
-  // PATCH /devices/{id}
   @PatchMapping("/{id}")
-  public DeviceResponse updatePatch(@PathVariable UUID id, @RequestBody DevicePatchRequest req) {
+  public ResponseEntity<DeviceResponse> updatePatch(
+    @PathVariable UUID id,
+    @RequestHeader(value = "If-Match", required = false) String ifMatch,
+    @RequestBody DevicePatchRequest req
+  ) {
+    assertIfMatch(id, ifMatch);
     var updated = service.updatePatch(new UpdateDevicePatchCommand(
       id,
       Optional.ofNullable(req.name()),
       Optional.ofNullable(req.brand()),
       Optional.ofNullable(req.state())
     ));
-    return DeviceMapper.toResponse(updated);
+    return ResponseEntity.ok()
+      .eTag(EtagUtil.etagFor(updated))
+      .body(DeviceMapper.toResponse(updated));
   }
 
-  // DELETE /devices/{id}
   @DeleteMapping("/{id}")
-  public ResponseEntity<Void> delete(@PathVariable UUID id) {
+  public ResponseEntity<Void> delete(
+    @PathVariable UUID id,
+    @RequestHeader(value = "If-Match", required = false) String ifMatch
+  ) {
+    assertIfMatch(id, ifMatch);
     service.delete(id);
     return ResponseEntity.noContent().build();
   }
@@ -141,6 +139,15 @@ public class DeviceController {
       return DeviceState.valueOf(raw.trim().toUpperCase(Locale.ROOT));
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid state: " + raw);
+    }
+  }
+
+  private void assertIfMatch(UUID id, String ifMatchHeader) {
+    if (ifMatchHeader == null || ifMatchHeader.isBlank()) return;
+    var current = service.get(id);
+    var currentEtag = EtagUtil.etagFor(current);
+    if (!ifMatchHeader.equals(currentEtag)) {
+      throw new IllegalArgumentException("Precondition failed (If-Match does not match current ETag)");
     }
   }
 }

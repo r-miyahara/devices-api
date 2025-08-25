@@ -55,4 +55,11 @@ public class RestExceptionHandler {
   private static String formatFieldError(FieldError fe) {
     return "%s: %s".formatted(fe.getField(), fe.getDefaultMessage());
   }
+
+  @ExceptionHandler(PreconditionFailed.class)
+  public ResponseEntity<ErrorResponse> precondition(PreconditionFailed ex, HttpServletRequest req) {
+    return build(HttpStatus.PRECONDITION_FAILED, "Precondition Failed", ex.getMessage(), req);
+  }
+  class PreconditionFailed extends RuntimeException { PreconditionFailed(String m){ super(m);} }
+
 }

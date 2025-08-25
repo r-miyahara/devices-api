@@ -13,10 +13,17 @@ public interface DeviceRepository {
   Optional<Device> findById(UUID id);
 
   List<Device> findAll();
-
   List<Device> findByBrand(String brand);
-
   List<Device> findByState(DeviceState state);
+
+  // --- novos: paginação e contagem ---
+  List<Device> findAllPaged(int page, int size);
+  List<Device> findByBrandPaged(String brand, int page, int size);
+  List<Device> findByStatePaged(DeviceState state, int page, int size);
+
+  long countAll();
+  long countByBrand(String brand);
+  long countByState(DeviceState state);
 
   void deleteById(UUID id);
 }

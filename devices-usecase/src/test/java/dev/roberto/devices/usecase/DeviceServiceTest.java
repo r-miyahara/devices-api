@@ -187,6 +187,36 @@ class DeviceServiceTest {
     }
 
     @Override
+    public List<Device> findAllPaged(int page, int size) {
+      return null;
+    }
+
+    @Override
+    public List<Device> findByBrandPaged(String brand, int page, int size) {
+      return null;
+    }
+
+    @Override
+    public List<Device> findByStatePaged(DeviceState state, int page, int size) {
+      return null;
+    }
+
+    @Override
+    public long countAll() {
+      return 0;
+    }
+
+    @Override
+    public long countByBrand(String brand) {
+      return 0;
+    }
+
+    @Override
+    public long countByState(DeviceState state) {
+      return 0;
+    }
+
+    @Override
     public void deleteById(UUID id) {
       store.remove(id);
     }

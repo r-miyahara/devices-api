@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.PageRequest;
+
 @Repository
 public class JpaDeviceRepository implements DeviceRepository {
 
@@ -44,6 +46,39 @@ public class JpaDeviceRepository implements DeviceRepository {
   @Override
   public List<Device> findByState(DeviceState state) {
     return jpa.findByState(state).stream().map(DeviceJpaMapper::toDomain).toList();
+  }
+
+  @Override
+  public List<Device> findAllPaged(int page, int size) {
+    return jpa.findAll(PageRequest.of(page, size))
+      .map(DeviceJpaMapper::toDomain).toList();
+  }
+
+  @Override
+  public List<Device> findByBrandPaged(String brand, int page, int size) {
+    return jpa.findByBrand(brand, PageRequest.of(page, size))
+      .map(DeviceJpaMapper::toDomain).toList();
+  }
+
+  @Override
+  public List<Device> findByStatePaged(DeviceState state, int page, int size) {
+    return jpa.findByState(state, PageRequest.of(page, size))
+      .map(DeviceJpaMapper::toDomain).toList();
+  }
+
+  @Override
+  public long countAll() {
+    return jpa.count();
+  }
+
+  @Override
+  public long countByBrand(String brand) {
+    return jpa.countByBrand(brand);
+  }
+
+  @Override
+  public long countByState(DeviceState state) {
+    return jpa.countByState(state);
   }
 
   @Override

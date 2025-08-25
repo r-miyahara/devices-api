@@ -9,6 +9,7 @@ import dev.roberto.devices.usecase.command.UpdateDevicePatchCommand;
 import dev.roberto.devices.usecase.command.UpdateDevicePutCommand;
 import dev.roberto.devices.usecase.exception.DomainRuleViolationException;
 import dev.roberto.devices.usecase.exception.NotFoundException;
+import java.util.Optional;
 
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +49,31 @@ public class DeviceService {
 
   public List<Device> listByState(DeviceState state) {
     return repository.findByState(state);
+  }
+
+  public PageResult<Device> listPaged(Optional<String> brand, Optional<DeviceState> state, int page, int size) {
+    if (brand.isEmpty() && state.isEmpty()) {
+      var items = repository.findAllPaged(page, size);
+      var total = repository.countAll();
+      return new PageResult<>(items, total, page, size);
+    }
+    if (brand.isPresent() && state.isEmpty()) {
+      var items = repository.findByBrandPaged(brand.get(), page, size);
+      var total = repository.countByBrand(brand.get());
+      return new PageResult<>(items, total, page, size);
+    }
+    if (state.isPresent() && brand.isEmpty()) {
+      var items = repository.findByStatePaged(state.get(), page, size);
+      var total = repository.countByState(state.get());
+      return new PageResult<>(items, total, page, size);
+    }
+    var byBrand = repository.findByBrand(brand.get());
+    var filtered = byBrand.stream().filter(d -> d.state() == state.get()).toList();
+    var total = filtered.size();
+    int from = Math.min(page * size, total);
+    int to = Math.min(from + size, total);
+    var pageItems = filtered.subList(from, to);
+    return new PageResult<>(pageItems, total, page, size);
   }
 
   // UPDATE - PUT (replace all fields but keep creationTime)
