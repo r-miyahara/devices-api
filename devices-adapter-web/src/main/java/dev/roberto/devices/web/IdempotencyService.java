@@ -1,21 +1,29 @@
 package dev.roberto.devices.web;
 
+import dev.roberto.devices.domain.port.IdempotencyStore;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
-/**
- * Store simples em memória para POST idempotente.
- * Pode ser substituído por uma implementação persistente futuramente.
- */
 @Service
 class IdempotencyService {
-  private final ConcurrentMap<String, UUID> map = new ConcurrentHashMap<>();
 
-  Optional<UUID> get(String key) { return Optional.ofNullable(map.get(key)); }
+  private static final Duration DEFAULT_TTL = Duration.ofHours(24);
 
-  void putIfAbsent(String key, UUID id) { map.putIfAbsent(key, id); }
+  private final IdempotencyStore store;
+
+  IdempotencyService(IdempotencyStore store) {
+    this.store = store;
+  }
+
+  Optional<UUID> get(String key) {
+    return store.get(key);
+  }
+
+  void putIfAbsent(String key, UUID id) {
+    store.saveIfAbsent(key, id, Instant.now(), DEFAULT_TTL);
+  }
 }
