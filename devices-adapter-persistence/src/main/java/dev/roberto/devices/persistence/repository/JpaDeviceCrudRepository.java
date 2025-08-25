@@ -13,7 +13,6 @@ public interface JpaDeviceCrudRepository extends JpaRepository<DeviceEntity, UUI
   List<DeviceEntity> findByBrand(String brand);
   List<DeviceEntity> findByState(DeviceState state);
 
-  // novos (paginados)
   Page<DeviceEntity> findAll(Pageable pageable);
   Page<DeviceEntity> findByBrand(String brand, Pageable pageable);
   Page<DeviceEntity> findByState(DeviceState state, Pageable pageable);

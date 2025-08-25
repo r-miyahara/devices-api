@@ -14,6 +14,6 @@ public record DeviceRequest(
   @Pattern(regexp = "^[\\p{L}0-9 ._\\-]{1,255}$", message = "invalid characters")
   String brand,
 
-  // opcional (PUT/PATCH preservam quando null)
+
   DeviceState state
 ) {}

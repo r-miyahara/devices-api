@@ -16,7 +16,6 @@ final class EtagUtil {
       var digest = MessageDigest.getInstance("SHA-256").digest(raw);
       return "\"" + Base64.getUrlEncoder().withoutPadding().encodeToString(digest) + "\"";
     } catch (Exception e) {
-      // fallback (não ideal, mas evita quebrar a resposta)
       return "\"" + d.id() + "\"";
     }
   }

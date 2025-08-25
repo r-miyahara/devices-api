@@ -16,7 +16,7 @@ public interface DeviceRepository {
   List<Device> findByBrand(String brand);
   List<Device> findByState(DeviceState state);
 
-  // --- novos: paginação e contagem ---
+
   List<Device> findAllPaged(int page, int size);
   List<Device> findByBrandPaged(String brand, int page, int size);
   List<Device> findByStatePaged(DeviceState state, int page, int size);

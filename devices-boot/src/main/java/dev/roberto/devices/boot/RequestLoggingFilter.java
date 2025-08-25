@@ -23,7 +23,7 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
     } finally {
       long dur = System.currentTimeMillis() - start;
-      // Log simples, fácil de parsear
+
       log.info("request method={} path={} status={} duration_ms={}",
         request.getMethod(), request.getRequestURI(), response.getStatus(), dur);
     }

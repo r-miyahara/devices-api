@@ -25,24 +25,24 @@ public class DeviceService {
     this.time = Objects.requireNonNull(time);
   }
 
-  // CREATE
+
   public Device create(CreateDeviceCommand cmd) {
     var device = Device.create(cmd.name(), cmd.brand(), cmd.state(), time);
     return repository.save(device);
   }
 
-  // READ (one)
+
   public Device get(UUID id) {
     return repository.findById(id)
       .orElseThrow(() -> new NotFoundException("Device %s not found".formatted(id)));
   }
 
-  // READ (all)
+
   public List<Device> listAll() {
     return repository.findAll();
   }
 
-  // FILTERS
+
   public List<Device> listByBrand(String brand) {
     return repository.findByBrand(brand);
   }
@@ -76,17 +76,17 @@ public class DeviceService {
     return new PageResult<>(pageItems, total, page, size);
   }
 
-  // UPDATE - PUT (replace all fields but keep creationTime)
+
   public Device updatePut(UpdateDevicePutCommand cmd) {
     var current = get(cmd.id());
 
-    // Regra: se o dispositivo está IN_USE, não pode alterar name/brand
+
     if (current.state() == DeviceState.IN_USE &&
       (!current.name().equals(cmd.name()) || !current.brand().equals(cmd.brand()))) {
       throw new DomainRuleViolationException("Cannot change name/brand when device is IN_USE");
     }
 
-    // Regra adicional: se o novo estado será IN_USE, não permitir que name/brand mudem na mesma operação
+
     if (cmd.state() == DeviceState.IN_USE &&
       (!current.name().equals(cmd.name()) || !current.brand().equals(cmd.brand()))) {
       throw new DomainRuleViolationException("Cannot change name/brand when setting state to IN_USE");
@@ -100,7 +100,7 @@ public class DeviceService {
     return repository.save(updated);
   }
 
-  // UPDATE - PATCH (partial)
+
   public Device updatePatch(UpdateDevicePatchCommand cmd) {
     var current = get(cmd.id());
 
@@ -108,7 +108,7 @@ public class DeviceService {
     var newBrand = cmd.brand().orElse(current.brand());
     var newState = cmd.state().orElse(current.state());
 
-    // Mesmas regras de bloqueio de name/brand em IN_USE (estado atual ou resultante)
+
     boolean changingNameOrBrand = !current.name().equals(newName) || !current.brand().equals(newBrand);
     if ((current.state() == DeviceState.IN_USE && changingNameOrBrand) ||
       (newState == DeviceState.IN_USE && changingNameOrBrand)) {
@@ -123,7 +123,7 @@ public class DeviceService {
     return repository.save(updated);
   }
 
-  // DELETE
+
   public void delete(UUID id) {
     var current = get(id);
     if (current.state() == DeviceState.IN_USE) {

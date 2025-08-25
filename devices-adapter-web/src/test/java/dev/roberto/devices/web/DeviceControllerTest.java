@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.roberto.devices.domain.model.Device;
 import dev.roberto.devices.domain.model.DeviceState;
 import dev.roberto.devices.usecase.DeviceService;
+import dev.roberto.devices.usecase.PageResult;
 import dev.roberto.devices.usecase.command.UpdateDevicePutCommand;
 import dev.roberto.devices.usecase.exception.DomainRuleViolationException;
 import dev.roberto.devices.usecase.exception.NotFoundException;
@@ -17,16 +18,16 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = DeviceController.class)
@@ -36,7 +37,7 @@ class DeviceControllerTest {
   @Autowired ObjectMapper om;
 
   @MockBean DeviceService service;
-  @MockBean IdempotencyService idempotencyService; // necessário após Commit 9
+  @MockBean IdempotencyService idempotencyService;
 
   @Test
   void create_shouldReturn201_location_andEtag() throws Exception {
@@ -51,7 +52,7 @@ class DeviceControllerTest {
         .content(om.writeValueAsBytes(body)))
       .andExpect(status().isCreated())
       .andExpect(header().string("Location", "/devices/" + id))
-      .andExpect(header().exists("ETag")) // novo header do Commit 9
+      .andExpect(header().exists("ETag"))
       .andExpect(jsonPath("$.id", is(id.toString())))
       .andExpect(jsonPath("$.name", is("WS-01")))
       .andExpect(jsonPath("$.brand", is("Lenovo")))
@@ -76,7 +77,6 @@ class DeviceControllerTest {
     var d = new Device(id, "WS-01", "Lenovo", DeviceState.AVAILABLE, Instant.parse("2025-01-01T00:00:00Z"));
     org.mockito.Mockito.when(service.get(id)).thenReturn(d);
 
-    // Como o teste está no mesmo pacote (dev.roberto.devices.web), EtagUtil é acessível
     var etag = EtagUtil.etagFor(d);
 
     mvc.perform(get("/devices/{id}", id).header("If-None-Match", etag))
@@ -87,11 +87,16 @@ class DeviceControllerTest {
   @Test
   void list_byState_shouldReturnFiltered_andTotalCountHeader() throws Exception {
     var a = new Device(UUID.randomUUID(), "A", "Apple", DeviceState.AVAILABLE, Instant.now());
-    org.mockito.Mockito.when(service.listByState(DeviceState.AVAILABLE)).thenReturn(List.of(a));
+    var page = new PageResult<>(List.of(a), 1L, 0, 20);
+
+
+    org.mockito.Mockito.when(
+      service.listPaged(eq(Optional.empty()), eq(Optional.of(DeviceState.AVAILABLE)), anyInt(), anyInt())
+    ).thenReturn(page);
 
     mvc.perform(get("/devices").param("state", "available"))
       .andExpect(status().isOk())
-      .andExpect(header().string("X-Total-Count", "1")) // novo header do Commit 9
+      .andExpect(header().string("X-Total-Count", "1"))
       .andExpect(jsonPath("$", hasSize(1)))
       .andExpect(jsonPath("$[0].name", is("A")))
       .andExpect(jsonPath("$[0].state", is("AVAILABLE")));

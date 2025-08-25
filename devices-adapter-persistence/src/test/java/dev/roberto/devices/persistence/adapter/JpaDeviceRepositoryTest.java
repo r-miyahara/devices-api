@@ -40,7 +40,6 @@ class JpaDeviceRepositoryTest {
     var found = repo.findById(id).orElseThrow();
     assertEquals("WS-01", found.name());
 
-    // sanity: entity really exists
     assertTrue(crud.findById(id).isPresent());
   }
 

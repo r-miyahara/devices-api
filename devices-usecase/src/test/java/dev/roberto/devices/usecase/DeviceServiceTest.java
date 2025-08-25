@@ -41,7 +41,7 @@ class DeviceServiceTest {
     assertEquals(DeviceState.AVAILABLE, created.state()); // default
     assertEquals(time.now(), created.creationTime());
 
-    // repo should contain it
+
     assertEquals(1, repo.store.size());
   }
 
@@ -149,6 +149,60 @@ class DeviceServiceTest {
     assertTrue(repo.findById(d.id()).isEmpty());
   }
 
+  @Test
+  void listPaged_all_shouldReturnSecondPage_andTotal() {
+
+    service.create(new CreateDeviceCommand("A", "Any", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("B", "Any", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("C", "Any", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("D", "Any", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("E", "Any", DeviceState.AVAILABLE));
+
+    var pr = service.listPaged(Optional.empty(), Optional.empty(), 1, 2); // page=1, size=2 → C,D
+    assertEquals(5L, pr.total());
+    assertEquals(2, pr.items().size());
+    assertEquals("C", pr.items().get(0).name());
+    assertEquals("D", pr.items().get(1).name());
+  }
+
+  @Test
+  void listPaged_brand_shouldFilterAndPage_andTotal() {
+    service.create(new CreateDeviceCommand("A1", "Apple", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("A2", "Apple", DeviceState.INACTIVE));
+    service.create(new CreateDeviceCommand("L1", "Lenovo", DeviceState.AVAILABLE));
+
+    var pr = service.listPaged(Optional.of("Apple"), Optional.empty(), 0, 5);
+    assertEquals(2L, pr.total());
+    assertEquals(2, pr.items().size());
+    assertTrue(pr.items().stream().allMatch(d -> d.brand().equals("Apple")));
+  }
+
+  @Test
+  void listPaged_state_shouldFilterAndPage_andTotal() {
+    service.create(new CreateDeviceCommand("X1", "Foo", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("X2", "Foo", DeviceState.IN_USE));
+    service.create(new CreateDeviceCommand("X3", "Bar", DeviceState.IN_USE));
+
+    var pr = service.listPaged(Optional.empty(), Optional.of(DeviceState.IN_USE), 0, 10);
+    assertEquals(2L, pr.total());
+    assertEquals(2, pr.items().size());
+    assertTrue(pr.items().stream().allMatch(d -> d.state() == DeviceState.IN_USE));
+  }
+
+  @Test
+  void listPaged_brandAndState_shouldIntersect_andPage_andTotal() {
+    service.create(new CreateDeviceCommand("A1", "Apple", DeviceState.AVAILABLE));
+    service.create(new CreateDeviceCommand("A2", "Apple", DeviceState.IN_USE));
+    service.create(new CreateDeviceCommand("A3", "Apple", DeviceState.IN_USE));
+    service.create(new CreateDeviceCommand("L1", "Lenovo", DeviceState.IN_USE));
+
+    var pr = service.listPaged(Optional.of("Apple"), Optional.of(DeviceState.IN_USE), 0, 2);
+    assertEquals(2L, pr.total());
+    assertEquals(2, pr.items().size());
+    var names = pr.items().stream().map(Device::name).sorted().toList();
+    assertEquals(List.of("A2", "A3"), names);
+  }
+
   // ----------------- helpers (fakes) -----------------
 
   static class FixedTimeProvider implements TimeProvider {
@@ -188,32 +242,49 @@ class DeviceServiceTest {
 
     @Override
     public List<Device> findAllPaged(int page, int size) {
-      return null;
+      var all = store.values().stream()
+        .sorted(Comparator.comparing(Device::name))
+        .toList();
+      return paginate(all, page, size);
     }
 
     @Override
     public List<Device> findByBrandPaged(String brand, int page, int size) {
-      return null;
+      var list = store.values().stream()
+        .filter(d -> d.brand().equals(brand))
+        .sorted(Comparator.comparing(Device::name))
+        .toList();
+      return paginate(list, page, size);
     }
 
     @Override
     public List<Device> findByStatePaged(DeviceState state, int page, int size) {
-      return null;
+      var list = store.values().stream()
+        .filter(d -> d.state() == state)
+        .sorted(Comparator.comparing(Device::name))
+        .toList();
+      return paginate(list, page, size);
     }
 
     @Override
     public long countAll() {
-      return 0;
+      return store.size();
     }
 
     @Override
     public long countByBrand(String brand) {
-      return 0;
+      return store.values().stream().filter(d -> d.brand().equals(brand)).count();
     }
 
     @Override
     public long countByState(DeviceState state) {
-      return 0;
+      return store.values().stream().filter(d -> d.state() == state).count();
+    }
+    private static List<Device> paginate(List<Device> list, int page, int size) {
+      int total = list.size();
+      int from = Math.min(Math.max(page, 0) * Math.max(size, 1), total);
+      int to = Math.min(from + Math.max(size, 1), total);
+      return list.subList(from, to);
     }
 
     @Override

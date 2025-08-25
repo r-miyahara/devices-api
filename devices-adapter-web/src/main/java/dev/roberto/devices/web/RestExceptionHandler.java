@@ -25,7 +25,7 @@ public class RestExceptionHandler {
 
   @ExceptionHandler(DomainRuleViolationException.class)
   public ResponseEntity<ErrorResponse> domainRule(DomainRuleViolationException ex, HttpServletRequest req) {
-    // 422 para violação de regra de domínio
+
     return build(HttpStatus.UNPROCESSABLE_ENTITY, "Domain Rule Violation", ex.getMessage(), req);
   }
 

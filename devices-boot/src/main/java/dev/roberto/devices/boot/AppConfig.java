@@ -13,7 +13,6 @@ public class AppConfig {
 
   @Bean
   TimeProvider timeProvider() {
-    // Implementação simples, testável (via bean override em testes)
     return Instant::now;
   }
 
