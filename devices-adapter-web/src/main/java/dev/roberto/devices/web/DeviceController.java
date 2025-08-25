@@ -13,11 +13,14 @@ import dev.roberto.devices.web.dto.DeviceResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Tag(name = "Devices", description = "Devices CRUD and filters")
 @RestController
 @RequestMapping("/devices")
 public class DeviceController {
@@ -30,7 +33,7 @@ public class DeviceController {
   }
 
 
-  // POST /devices
+  @Operation(summary = "Create a device")
   @PostMapping
   public ResponseEntity<DeviceResponse> create(
     @RequestHeader(value = "Idempotency-Key", required = false) String idemKey,
@@ -59,7 +62,7 @@ public class DeviceController {
       .body(DeviceMapper.toResponse(created));
   }
 
-
+  @Operation(summary = "Get a device by ID")
   @GetMapping("/{id}")
   public ResponseEntity<DeviceResponse> get(
     @PathVariable UUID id,
@@ -79,7 +82,7 @@ public class DeviceController {
       .body(DeviceMapper.toResponse(d));
   }
 
-
+  @Operation(summary = "List devices with filters and pagination")
   @GetMapping
   public ResponseEntity<List<DeviceResponse>> list(
     @RequestParam Optional<String> brand,
@@ -99,7 +102,7 @@ public class DeviceController {
       .header("Cache-Control", "no-store")
       .body(body);
   }
-
+  @Operation(summary = "Replace a device (PUT)")
   @PutMapping("/{id}")
   public ResponseEntity<DeviceResponse> updatePut(
     @PathVariable UUID id,
@@ -112,7 +115,7 @@ public class DeviceController {
       .eTag(EtagUtil.etagFor(updated))
       .body(DeviceMapper.toResponse(updated));
   }
-
+  @Operation(summary = "Partially update a device (PATCH)")
   @PatchMapping("/{id}")
   public ResponseEntity<DeviceResponse> updatePatch(
     @PathVariable UUID id,
@@ -130,7 +133,7 @@ public class DeviceController {
       .eTag(EtagUtil.etagFor(updated))
       .body(DeviceMapper.toResponse(updated));
   }
-
+  @Operation(summary = "Delete a device")
   @DeleteMapping("/{id}")
   public ResponseEntity<Void> delete(
     @PathVariable UUID id,
@@ -141,7 +144,7 @@ public class DeviceController {
     return ResponseEntity.noContent().build();
   }
 
-  private static DeviceState parseState(String raw) {
+  private DeviceState parseState(String raw) {
     try {
       return DeviceState.valueOf(raw.trim().toUpperCase(Locale.ROOT));
     } catch (Exception e) {
