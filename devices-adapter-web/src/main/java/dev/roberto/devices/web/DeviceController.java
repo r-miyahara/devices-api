@@ -68,9 +68,15 @@ public class DeviceController {
     var d = service.get(id);
     var etag = EtagUtil.etagFor(d);
     if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
-      return ResponseEntity.status(304).eTag(etag).build();
+      return ResponseEntity.status(304)
+        .eTag(etag)
+        .header("Cache-Control", "max-age=60, must-revalidate")
+        .build();
     }
-    return ResponseEntity.ok().eTag(etag).body(DeviceMapper.toResponse(d));
+    return ResponseEntity.ok()
+      .eTag(etag)
+      .header("Cache-Control", "max-age=60, must-revalidate")
+      .body(DeviceMapper.toResponse(d));
   }
 
 
@@ -84,12 +90,13 @@ public class DeviceController {
     size = Math.max(1, Math.min(size, 200));
     page = Math.max(0, page);
 
-    Optional<DeviceState> st = state.map(s -> parseState(s));
-    PageResult<Device> pr = service.listPaged(brand, st, page, size);
-
+    Optional<DeviceState> st = state.map(this::parseState);
+    var pr = service.listPaged(brand, st, page, size);
     var body = pr.items().stream().map(DeviceMapper::toResponse).toList();
+
     return ResponseEntity.ok()
       .header("X-Total-Count", String.valueOf(pr.total()))
+      .header("Cache-Control", "no-store")
       .body(body);
   }
 
@@ -147,7 +154,7 @@ public class DeviceController {
     var current = service.get(id);
     var currentEtag = EtagUtil.etagFor(current);
     if (!ifMatchHeader.equals(currentEtag)) {
-      throw new IllegalArgumentException("Precondition failed (If-Match does not match current ETag)");
+      throw new PreconditionFailed("If-Match does not match current ETag");
     }
   }
 }

@@ -60,6 +60,7 @@ public class RestExceptionHandler {
   public ResponseEntity<ErrorResponse> precondition(PreconditionFailed ex, HttpServletRequest req) {
     return build(HttpStatus.PRECONDITION_FAILED, "Precondition Failed", ex.getMessage(), req);
   }
+
   class PreconditionFailed extends RuntimeException { PreconditionFailed(String m){ super(m);} }
 
 }
