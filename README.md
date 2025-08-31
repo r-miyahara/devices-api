@@ -1,119 +1,108 @@
-# Devices API — Clean Architecture Skeleton (First Commit)
+# Devices API — Clean Architecture
 
-Baseline skeleton to implement the **first step** of the challenge: project wiring, libraries, structure, and containerization — **no business code yet**.
+API to manage **Devices** following **Clean Architecture + SOLID + Clean Code**.  
+Implements CRUD + filters, domain rules, persistence on PostgreSQL (non in-memory), OpenAPI docs, tests, and containerization.
 
-Future commits will add domain objects, communication layers (web/persistence), use cases, unit tests, and refactors. All changes will be delivered as **small, granular commits** with clear messages.
+## Scope (from challenge)
+- **Device**: `id`, `name`, `brand`, `state (available | in-use | inactive)`, `creationTime`
+- **Features**: create; full/partial update; get by id; list all; list by brand; list by state; delete
+- **Domain rules**: `creationTime` **cannot change**; **name/brand cannot change if in-use**; **in-use cannot be deleted**
+- **Acceptance**: compiles/runs; reasonable tests; documented API; **DB not in-memory**; containerized; README
 
----
+## Tech
+- Java 21, Maven 3.9+
+- Spring Boot 3.3.x (web, validation, actuator)
+- springdoc-openapi (Swagger UI)
+- PostgreSQL + Flyway (migrations)
+- Tests: unit + web slice + JPA slice
+- Docker/Docker Compose
 
-## Status
-
-- ✅ Build, run, and containerization ready  
-- ✅ Spring Boot app starter (no endpoints yet)  
-- ✅ PostgreSQL + Flyway pre-wired (migrations folder ready)  
-- ⏳ Domain, Use Cases, Web & Persistence layers (next commits)
-
----
-
-## Tech Stack & Rationale
-
-- **Java 21**, **Maven 3.9+**
-- **Spring Boot 3.3.x** — production-ready web runtime, Actuator, easy containerization
-- **springdoc-openapi** — API docs at `/docs` (will appear once the REST layer exists)
-- **PostgreSQL + Flyway** — fulfills the “non in-memory DB” requirement and provides versioned migrations
-- **Clean Architecture** — strict boundaries via modules
-
----
-
-## Project Layout (Multi-Module)
-
+## Project layout (multi-module)
 ```
-devices-domain/               # Pure domain models and ports (no framework)
-devices-usecase/              # Application services & use cases (depends on domain)
-devices-adapter-web/          # REST controllers, DTO mappers, exception handlers
-devices-adapter-persistence/  # JPA repositories & entities, Flyway migrations
-devices-boot/                 # Spring Boot launcher (depends on adapters + usecase)
+devices-domain/               # domain (models, enums, ports)
+devices-usecase/              # use cases / application services
+devices-adapter-web/          # REST controllers, DTOs, mappers, handlers
+devices-adapter-persistence/  # JPA entities/repositories, adapters, migrations
+devices-boot/                 # Spring Boot app (wiring/config)
 ```
 
-> The app composes at the **boot** module, keeping the domain and use cases framework-agnostic.
+> If you are on the single-module flavor, paths become `src/main/java/dev/roberto/devices/...` and `src/main/resources/db/migration`.
 
----
-
-## How to Run (Dev)
-
-From repository root:
-
+## How to run (dev)
 ```bash
-# Build the app (without tests for now)
+# Build
 mvn -q -DskipTests -pl devices-boot -am package
 
-# Start only PostgreSQL (so you can run the app locally)
+# Start Postgres
 docker compose up -d db
 
-# Run the application
+# Run the app
 java -jar devices-boot/target/devices-boot-0.1.0-SNAPSHOT.jar
 ```
 
-Once the REST layer is implemented, API docs will be available at:
-
-- Swagger UI → `http://localhost:8080/docs`  
+Docs:
+- Swagger UI → `http://localhost:8080/docs`
 - OpenAPI JSON → `http://localhost:8080/v3/api-docs`
 
----
-
-## How to Run (Containers)
-
+## How to run (containers)
 ```bash
-# Build and run app + db
 docker compose up --build
 ```
 
-> By default the app listens on **:8080** and the database on **:5432**.
+## Configuration (env)
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `DB_URL` | `jdbc:postgresql://localhost:5432/devices` | JDBC URL |
+| `DB_USER` | `devices` | DB user |
+| `DB_PASSWORD` | `devices` | DB password |
+| `SPRING_PROFILES_ACTIVE` | *(empty / set by compose)* | Active profile |
 
----
+## API (quick examples)
 
-## Configuration
+**Create**
+```bash
+curl -i -X POST http://localhost:8080/devices   -H 'Content-Type: application/json'   -d '{"name":"WS-01","brand":"Lenovo","state":"AVAILABLE"}'
+```
 
-Environment variables (used by Spring properties):
+**Get by ID**
+```bash
+curl -i http://localhost:8080/devices/{id}
+```
 
-| Env Var         | Default                                      | Purpose                    |
-|-----------------|----------------------------------------------|----------------------------|
-| `DB_URL`        | `jdbc:postgresql://localhost:5432/devices`   | JDBC URL                   |
-| `DB_USER`       | `devices`                                     | DB username                |
-| `DB_PASSWORD`   | `devices`                                     | DB password                |
-| `SPRING_PROFILES_ACTIVE` | *(empty / set by compose)*          | Active Spring profile      |
+**List**
+```bash
+curl -s http://localhost:8080/devices
+curl -s "http://localhost:8080/devices?brand=Lenovo"
+curl -s "http://localhost:8080/devices?state=available"
+```
 
-Flyway looks for SQL migrations in:  
-`devices-adapter-persistence/src/main/resources/db/migration/`
+**Update (PUT)**
+```bash
+curl -i -X PUT http://localhost:8080/devices/{id}   -H 'Content-Type: application/json'   -d '{"name":"WS-02","brand":"Lenovo","state":"INACTIVE"}'
+```
 
-> First commit ships without migrations on purpose. Flyway will simply run with 0 migrations. Next commits will add `V001__...` and subsequent files.
+**Patch**
+```bash
+curl -i -X PATCH http://localhost:8080/devices/{id}   -H 'Content-Type: application/json'   -d '{"brand":"HP"}'
+```
 
----
+**Delete**
+```bash
+curl -i -X DELETE http://localhost:8080/devices/{id}
+```
 
-## Coding Standards
+### Domain rules (how to verify)
+- `creationTime` never changes across updates.  
+- With `state=in-use`, attempts to change `name` or `brand` return an error (422).  
+- Deleting a device in `in-use` state returns an error (422).
 
-- **SOLID / Clean Architecture / Clean Code**
-- Domain and use cases are **framework-free**
-- Adapters (web/persistence) are thin and replaceable
-- Small, focused commits with clear messages and “how to validate” notes
-
----
-
-## Next Commits (Plan)
-
-1. **domain** — `Device`, `DeviceState`, `TimeProvider`, repository ports  
-2. **usecase** — `DeviceService` (create/get/list/filter/put/patch/delete + domain rules)  
-3. **web** — controllers, DTOs, mappers, validation, error handling, OpenAPI annotations  
-4. **persistence** — JPA entities, Spring Data repositories, adapters, Flyway `V001__...`  
-5. **boot/config** — final wiring and OpenAPI metadata  
-6. **tests** — unit tests (use cases) and slice tests (web/JPA)  
-7. **hardening** — ETag/If-None-Match/If-Match, Idempotency-Key, pagination, structured logs, CORS, payload limits  
-8. **docs** — README updates and usage examples
-
----
+## Tests & coverage
+```bash
+mvn test
+# (if JaCoCo enabled) open target/site/jacoco/index.html
+```
 
 ## Notes
-
-- This first commit intentionally contains **no domain models or endpoints**.
-- The app builds and starts to validate infrastructure and containerization early.
-- Keep commits **granular** to satisfy the challenge’s “traceable changes” requirement.
+- Uses PostgreSQL (not in-memory) to satisfy the requirement.
+- Containerization provided via Dockerfile + docker-compose.
+- Commits are granular and documented for traceability.

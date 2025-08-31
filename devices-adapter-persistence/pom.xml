@@ -4,41 +4,57 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>dev.roberto.devices</groupId>
-    <artifactId>devices-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.1</version>
+    <relativePath/>
   </parent>
 
+  <groupId>dev.roberto.devices</groupId>
   <artifactId>devices-adapter-persistence</artifactId>
-  <name>Devices API :: Adapter Persistence</name>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>Devices Adapter - Persistence</name>
+  <description>JPA adapters and Flyway migrations</description>
   <packaging>jar</packaging>
 
+  <properties>
+    <java.version>21</java.version>
+    <!-- Flyway modular (engine + driver Postgres) -->
+    <flyway.version>11.10.5</flyway.version>
+  </properties>
+
   <dependencies>
+    <!-- Depende do domínio para mapear entidades <-> modelos -->
     <dependency>
       <groupId>dev.roberto.devices</groupId>
       <artifactId>devices-domain</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <dependency>
-      <groupId>dev.roberto.devices</groupId>
-      <artifactId>devices-usecase</artifactId>
-      <version>${project.version}</version>
-    </dependency>
 
+    <!-- JPA e Driver -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
-    <!-- test -->
+
+    <!-- Flyway (corrigido) -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <version>${flyway.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+      <version>${flyway.version}</version>
+    </dependency>
+
+    <!-- Testes -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
@@ -49,11 +65,17 @@
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
-
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <release>${java.version}</release>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
